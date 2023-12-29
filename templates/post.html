@@ -26,7 +26,6 @@
     <div class="row gx-4 gx-lg-5 justify-content-center">
       <div class="col-md-10 col-lg-8 col-xl-7">
         {{ post.body|safe }}
-        <!--TODO: Only show Edit Post button if user id is 1 (admin user) -->
         {% if current_user.id == 1 %}
         <div class="d-flex justify-content-end mb-4">
           <a
@@ -41,16 +40,17 @@
         {{ render_form(form) }}
         {{ ckeditor.load() }} {{ ckeditor.config(name='comment') }}
         <div class="comment">
-          <!-- TODO: Show all the comments on a post -->
           <ul class="commentList">
             <li>
+              {% for comment in all_comments %}
               <div class="commenterImage">
-                <img src="../static/assets/img/default-profile.jpg" />
+                <img src="{{ comment.comment_author.email | gravatar }}" />
               </div>
               <div class="commentText">
-                <p>Some comment</p>
-                <span class="date sub-text">comment author name</span>
+                <p>{{ comment.text|safe }}</p>
+                <span class="date sub-text">{{ comment.comment_author.name }}</span>
               </div>
+              {% endfor %}
             </li>
           </ul>
         </div>

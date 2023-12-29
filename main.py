@@ -1,6 +1,6 @@
 from datetime import date
 from typing import List
-
+import hashlib
 import requests.cookies
 from flask import Flask, abort, render_template, redirect, url_for, flash, request
 from flask_bootstrap import Bootstrap5
@@ -28,6 +28,25 @@ login_manager.init_app(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
 db = SQLAlchemy()
 db.init_app(app)
+
+
+gravatar = Gravatar(app,
+                    size=100,
+                    rating='g',
+                    default='retro',
+                    force_default=False,
+                    force_lower=False,
+                    use_ssl=False,
+                    base_url=None)
+
+
+def get_gravatar_url(email, size=100, default='identicon'):
+    """
+    Generate Gravatar URL based on email address.
+    """
+    hash_email = hashlib.md5(email.lower().encode('utf-8')).hexdigest()
+    gravatar_url = f"https://www.gravatar.com/avatar/{hash_email}?s={size}&d={default}"
+    return gravatar_url
 
 
 class User(db.Model, UserMixin):
@@ -156,11 +175,27 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts, user=current_user)
 
 
-@app.route("/post/<int:post_id>")
+@app.route("/post/<int:post_id>", methods=['GET', 'POST'])
 def show_post(post_id):
     form = CommentForm()
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post, form=form)
+
+    result = db.session.execute(db.select(Comment))
+    all_comments = result.scalars().all()
+
+    if current_user.is_anonymous and form.validate_on_submit():
+        flash("You must be logged in or registered to write a comment.")
+        return redirect(url_for('login'))
+    elif current_user.is_authenticated and form.validate_on_submit():
+        new_comment = Comment(
+            author_id=current_user.id,
+            blog_post_id=post_id,
+            text=form.comment.data
+        )
+        db.session.add(new_comment)
+        db.session.commit()
+
+    return render_template("post.html", post=requested_post, form=form, all_comments=all_comments)
 
 
 @app.route("/new-post", methods=["GET", "POST"])

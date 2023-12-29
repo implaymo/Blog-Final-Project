@@ -25,6 +25,15 @@ include "header.html" %}
         {% if error %}
         <p class=flashes style="color: red"> {{ error }} </p>
       {% endif %}
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+          <ul class=flashes style="color: red">
+          {% for message in messages %}
+            <p>{{ message }}</p>
+          {% endfor %}
+          </ul>
+        {% endif %}
+      {% endwith %}
       {{ render_form(form) }}
       </div>
     </div>
