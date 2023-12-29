@@ -1,4 +1,5 @@
 from datetime import date
+from typing import List
 
 import requests.cookies
 from flask import Flask, abort, render_template, redirect, url_for, flash, request
@@ -8,9 +9,11 @@ from flask_gravatar import Gravatar
 from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
+
+from sqlalchemy import ForeignKey, Column, Integer
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship
-from forms import RegisterForm, LoginForm
+from forms import RegisterForm, LoginForm, CommentForm
 from forms import CreatePostForm
 
 app = Flask(__name__)
@@ -27,10 +30,24 @@ db = SQLAlchemy()
 db.init_app(app)
 
 
-# CONFIGURE TABLES
+class User(db.Model, UserMixin):
+    __tablename__ = 'user'
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    name = db.Column(db.String(1000))
+
+    blog_posts = relationship("BlogPost", back_populates="user")
+
+
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
-    id = db.Column(db.Integer, primary_key=True)
+
+    id = Column(Integer, primary_key=True)
+    author_id = Column(Integer, ForeignKey("user.id"))
+    user = relationship("User", back_populates="blog_posts")
+
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
     date = db.Column(db.String(250), nullable=False)
@@ -38,12 +55,11 @@ class BlogPost(db.Model):
     author = db.Column(db.String(250), nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
 
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
 
-class User(db.Model, UserMixin):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(100))
-    name = db.Column(db.String(1000))
 
 
 @login_manager.user_loader
@@ -134,22 +150,23 @@ def get_all_posts():
 # TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>")
 def show_post(post_id):
+    form = CommentForm()
     requested_post = db.get_or_404(BlogPost, post_id)
-    return render_template("post.html", post=requested_post)
+    return render_template("post.html", post=requested_post, form=form)
 
 
-# TODO: Use a decorator so only an admin user can create a new post
 @app.route("/new-post", methods=["GET", "POST"])
 @admin_required
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
         new_post = BlogPost(
+            author_id=current_user.id,
             title=form.title.data,
             subtitle=form.subtitle.data,
             body=form.body.data,
             img_url=form.img_url.data,
-            author=current_user,
+            author=current_user.name,
             date=date.today().strftime("%B %d, %Y")
         )
         db.session.add(new_post)
@@ -158,7 +175,6 @@ def add_new_post():
     return render_template("make-post.html", form=form)
 
 
-# TODO: Use a decorator so only an admin user can edit a post
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 @admin_required
 def edit_post(post_id):
@@ -181,7 +197,6 @@ def edit_post(post_id):
     return render_template("make-post.html", form=edit_form, is_edit=True)
 
 
-# TODO: Use a decorator so only an admin user can delete a post
 @app.route("/delete/<int:post_id>")
 @admin_required
 def delete_post(post_id):
