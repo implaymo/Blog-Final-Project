@@ -6,7 +6,7 @@ from flask import Flask, abort, render_template, redirect, url_for, flash, reque
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
 from flask_gravatar import Gravatar
-from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user
+from flask_login import UserMixin, login_user, LoginManager, current_user, logout_user, login_required
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 
@@ -38,7 +38,8 @@ class User(db.Model, UserMixin):
     password = db.Column(db.String(100))
     name = db.Column(db.String(1000))
 
-    blog_posts = relationship("BlogPost", back_populates="user")
+    posts = relationship("BlogPost", back_populates="blog_author")
+    comments = relationship("Comment", back_populates="comment_author")
 
 
 class BlogPost(db.Model):
@@ -46,7 +47,7 @@ class BlogPost(db.Model):
 
     id = Column(Integer, primary_key=True)
     author_id = Column(Integer, ForeignKey("user.id"))
-    user = relationship("User", back_populates="blog_posts")
+    blog_author = relationship("User", back_populates="posts")
 
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
@@ -55,11 +56,19 @@ class BlogPost(db.Model):
     author = db.Column(db.String(250), nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
 
+    comments = relationship("Comment", back_populates="blog_post")
+
+
 class Comment(db.Model):
     __tablename__ = "comments"
     id = db.Column(Integer, primary_key=True)
-    text = db.Column(db.Text, nullable=False)
 
+    author_id = Column(Integer, ForeignKey("user.id"))
+    comment_author = relationship("User", back_populates="comments")
+    blog_post_id = Column(Integer, ForeignKey("blog_posts.id"))
+    blog_post = relationship("BlogPost", back_populates="comments")
+
+    text = db.Column(db.Text, nullable=False)
 
 
 @login_manager.user_loader
@@ -147,7 +156,6 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts, user=current_user)
 
 
-# TODO: Allow logged-in users to comment on posts
 @app.route("/post/<int:post_id>")
 def show_post(post_id):
     form = CommentForm()
