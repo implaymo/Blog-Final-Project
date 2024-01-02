@@ -16,6 +16,9 @@ from sqlalchemy.orm import relationship
 from forms import RegisterForm, LoginForm, CommentForm
 from forms import CreatePostForm
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get("secret_key")
@@ -26,7 +29,7 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("database_uri")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("db_uri", "sqlite:///project.db")
 db = SQLAlchemy()
 db.init_app(app)
 
